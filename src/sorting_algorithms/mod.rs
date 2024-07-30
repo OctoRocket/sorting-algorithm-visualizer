@@ -12,4 +12,6 @@ pub trait SortingAlgorithm {
   fn get_name(&self) -> &str;
 
   fn get_list(&self) -> &[usize];
+
+  fn shuffle(&mut self);
 }

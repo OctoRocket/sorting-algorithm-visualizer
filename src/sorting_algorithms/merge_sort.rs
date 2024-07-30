@@ -1,3 +1,5 @@
+use rand::prelude::*;
+
 #[derive(Clone)]
 pub struct MergeSort<'a> {
   // Statics, defaulted by the sorting algorithm and kept that way
@@ -23,5 +25,10 @@ impl<'a> super::SortingAlgorithm for MergeSort<'a> {
 
   fn get_list(&self) -> &[usize] {
       &self.current_list
+  }
+
+  fn shuffle(&mut self) {
+      let mut rng = rand::thread_rng();
+      self.current_list.shuffle(&mut rng);
   }
 }

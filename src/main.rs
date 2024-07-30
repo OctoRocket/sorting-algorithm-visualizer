@@ -40,6 +40,13 @@ impl ProgramState<usize> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self::default()
     }
+
+    fn shuffle(&mut self) {
+        if let Some(algorithm) = &mut self.algorithm {
+            algorithm.shuffle();
+            self.list = algorithm.get_list().to_vec();
+        }
+    }
 }
 
 impl Default for ProgramState<usize> {
@@ -74,6 +81,9 @@ impl eframe::App for ProgramState<usize> {
             ui.vertical_centered_justified(|ui| {
                 ui.heading("Settings");
                 ui.add_space(15.0);
+                if ui.button("Shuffle").clicked() {
+                    self.shuffle();
+                }
                 ui.horizontal(|ui| {
                     let mut length = self.list.len();
                     ui.label("List length: ");
@@ -103,7 +113,6 @@ fn draw_graph(list: Vec<usize>) -> Box<dyn FnOnce(&mut egui::Ui)> {
         // times the width respectively.
         let desired_size = ui.available_width() * egui::vec2(1.0, 0.35);
         let (_id, rect) = ui.allocate_space(desired_size);
-        // let spacing = rect.width() / list.len() as f32 - 10.0;
 
         let bars = make_bars(rect, list, 10.0, 10.0, 10.0);
 
