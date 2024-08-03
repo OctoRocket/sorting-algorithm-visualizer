@@ -11,7 +11,7 @@ pub fn get_available_algorithms() -> Vec<Box<dyn SortingAlgorithm>> {
 pub trait SortingAlgorithm {
   fn get_name(&self) -> &str;
 
-  fn get_list(&self) -> &[usize];
+  fn get_list(&self) -> &Vec<Vec<usize>>;
 
-  fn shuffle(&mut self);
+  fn set_list(&mut self, list: Vec<Vec<usize>>);
 }

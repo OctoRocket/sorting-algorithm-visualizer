@@ -1,8 +1,17 @@
 mod sorting_algorithms;
 
+use rand::prelude::*;
+
 use std::sync::Arc;
 use eframe::egui::{self, epaint};
 use sorting_algorithms::SortingAlgorithm;
+
+const BAR_COLORS: [epaint::Color32; 4] = [
+    epaint::Color32::RED,
+    epaint::Color32::YELLOW,
+    epaint::Color32::GREEN,
+    epaint::Color32::BLUE,
+];
 
 fn main() -> eframe::Result {
     let viewport = egui::ViewportBuilder::default()
@@ -32,7 +41,7 @@ fn get_icon() -> egui::IconData {
 }
 
 struct ProgramState<T: Ord> {
-    list: Vec<T>,
+    list: Vec<Vec<T>>,
     algorithm: Option<Box<dyn SortingAlgorithm>>,
 }
 
@@ -42,9 +51,19 @@ impl ProgramState<usize> {
     }
 
     fn shuffle(&mut self) {
+        let mut rng = rand::thread_rng();
+
+        let mut new_list = self.list
+            .clone()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<usize>>();
+        new_list.shuffle(&mut rng);
+
+        self.list = vec![new_list];
+
         if let Some(algorithm) = &mut self.algorithm {
-            algorithm.shuffle();
-            self.list = algorithm.get_list().to_vec();
+            algorithm.set_list(self.list.clone())
         }
     }
 }
@@ -84,13 +103,16 @@ impl eframe::App for ProgramState<usize> {
                 if ui.button("Shuffle").clicked() {
                     self.shuffle();
                 }
+                if ui.button("TEST").clicked() {
+                    self.list = vec![vec![0, 2], vec![1, 3]];
+                }
                 ui.horizontal(|ui| {
-                    let mut length = self.list.len();
+                    let mut length = self.list.iter().flatten().count();
                     ui.label("List length: ");
                     ui.add(egui::DragValue::new(&mut length));
 
-                    if self.list.len() != length {
-                        self.list = (1..=length).collect();
+                    if self.list.iter().flatten().count() != length {
+                        self.list = vec![(1..=length).collect()];
                     }
                 })
             });
@@ -98,6 +120,7 @@ impl eframe::App for ProgramState<usize> {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
+                ui.add_space(35.0);
                 ui.heading("Sorting Algorithm Visualizer");
             });
             ui.centered_and_justified(draw_graph(self.list.clone()));
@@ -105,7 +128,7 @@ impl eframe::App for ProgramState<usize> {
     }
 }
 
-fn draw_graph(list: Vec<usize>) -> Box<dyn FnOnce(&mut egui::Ui)> {
+fn draw_graph(list: Vec<Vec<usize>>) -> Box<dyn FnOnce(&mut egui::Ui)> {
     Box::new(move |ui| {
         ui.ctx().request_repaint();
 
@@ -120,28 +143,40 @@ fn draw_graph(list: Vec<usize>) -> Box<dyn FnOnce(&mut egui::Ui)> {
     })
 }
 
-fn make_bars(rect: egui::Rect, list: Vec<usize>, base_height: f32, bar_spacing: f32, base_spacing: f32) -> Vec<epaint::Shape> {
+fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, bar_spacing: f32, base_spacing: f32) -> Vec<epaint::Shape> {
     let mut bars = vec![];
     let max_height = rect.height() - base_height - 25.0;
-    let bar_width = (rect.width() - bar_spacing) / list.len() as f32 - bar_spacing;
+    let bar_width = (rect.width() - bar_spacing) / list.iter().flatten().count() as f32 - bar_spacing;
 
-    let base = epaint::Shape::rect_filled(
-        epaint::Rect::from_two_pos(
-            epaint::pos2(rect.left(), rect.bottom()),
-            epaint::pos2(rect.right(), rect.bottom()  - base_height)
-        ),
-        0.0,
-        epaint::Color32::DARK_GRAY,
-    );
-    bars.push(base);
+    let filled_in = generate_filled_in(&list);
+    let base_width = rect.width() / filled_in.len() as f32;
+    let mut color_index = 0;
+    for slot in filled_in.iter().enumerate() {
+        if *slot.1 {
+            let color = if list.len() == 1 {
+                epaint::Color32::DARK_GRAY
+            } else {
+                BAR_COLORS[color_index % BAR_COLORS.len()]
+            };
+
+            let base = epaint::Shape::rect_filled(epaint::Rect::from_two_pos(
+                epaint::pos2(rect.left() + slot.0 as f32 * base_width, rect.bottom()),
+                epaint::pos2(rect.left() + (slot.0 + 1) as f32 * base_width, rect.bottom() - base_height),
+            ), 0.0, color);
+
+            bars.push(base);
+        } else {
+            color_index += 1;
+        }
+    }
 
     if list.is_empty() {
         return bars;
     }
 
-    let max_value = *list.iter().max().unwrap_or(&0) as f32;
-    let min_value = *list.iter().min().unwrap_or(&0) as f32;
-    for number in list.iter().enumerate() {
+    let max_value = *list.iter().flatten().max().unwrap_or(&0) as f32;
+    let min_value = *list.iter().flatten().min().unwrap_or(&0) as f32;
+    for number in list.iter().flatten().enumerate() {
         let bar_height = (*number.1 as f32 - min_value + 1.0) / max_value * max_height;
         let bar_offset = (number.0 as f32 * (bar_width + bar_spacing)) + rect.left() + bar_spacing;
 
@@ -157,4 +192,14 @@ fn make_bars(rect: egui::Rect, list: Vec<usize>, base_height: f32, bar_spacing: 
     }
 
     bars
+}
+
+fn generate_filled_in<T>(list: &[Vec<T>]) -> Vec<bool> {
+    let mut result = list.iter().flat_map(|v| {
+        let mut v = vec![true; v.len() * 4];
+        v.push(false);
+        v
+    });
+    result.next_back();
+    result.collect()
 }
