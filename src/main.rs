@@ -104,7 +104,7 @@ impl eframe::App for ProgramState<usize> {
                     self.shuffle();
                 }
                 if ui.button("TEST").clicked() {
-                    self.list = vec![vec![0, 2], vec![1, 3]];
+                    self.list = vec![vec![4, 2], vec![1, 3]];
                 }
                 ui.horizontal(|ui| {
                     let mut length = self.list.iter().flatten().count();
@@ -137,19 +137,18 @@ fn draw_graph(list: Vec<Vec<usize>>) -> Box<dyn FnOnce(&mut egui::Ui)> {
         let desired_size = ui.available_width() * egui::vec2(1.0, 0.35);
         let (_id, rect) = ui.allocate_space(desired_size);
 
-        let bars = make_bars(rect, list, 10.0, 10.0, 10.0);
+        let bars = make_bars(rect, list, 10.0, 10.0);
 
         ui.painter().extend(bars);
     })
 }
 
-fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, bar_spacing: f32, base_spacing: f32) -> Vec<epaint::Shape> {
+fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, base_spacing: f32) -> Vec<epaint::Shape> {
     let mut bars = vec![];
     let max_height = rect.height() - base_height - 25.0;
-    let bar_width = (rect.width() - bar_spacing) / list.iter().flatten().count() as f32 - bar_spacing;
 
     let filled_in = generate_filled_in(&list);
-    let base_width = rect.width() / filled_in.len() as f32;
+    let bar_width = rect.width() / filled_in.len() as f32;
     let mut color_index = 0;
     for slot in filled_in.iter().enumerate() {
         if *slot.1 {
@@ -160,8 +159,8 @@ fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, bar_spac
             };
 
             let base = epaint::Shape::rect_filled(epaint::Rect::from_two_pos(
-                epaint::pos2(rect.left() + slot.0 as f32 * base_width, rect.bottom()),
-                epaint::pos2(rect.left() + (slot.0 + 1) as f32 * base_width, rect.bottom() - base_height),
+                epaint::pos2(rect.left() + slot.0 as f32 * bar_width, rect.bottom()),
+                epaint::pos2(rect.left() + (slot.0 + 1) as f32 * bar_width, rect.bottom() - base_height),
             ), 0.0, color);
 
             bars.push(base);
@@ -175,15 +174,14 @@ fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, bar_spac
     }
 
     let max_value = *list.iter().flatten().max().unwrap_or(&0) as f32;
-    let min_value = *list.iter().flatten().min().unwrap_or(&0) as f32;
-    for number in list.iter().flatten().enumerate() {
-        let bar_height = (*number.1 as f32 - min_value + 1.0) / max_value * max_height;
-        let bar_offset = (number.0 as f32 * (bar_width + bar_spacing)) + rect.left() + bar_spacing;
+    let min_value = list.iter().flatten().min().unwrap_or(&0).saturating_sub(1) as f32;
+    for number in list.join(&[min_value as usize][..]).into_iter().enumerate() {
+        let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
 
         let bar = epaint::Shape::rect_filled(
             egui::Rect::from_two_pos(
-                epaint::pos2(bar_offset, rect.bottom() - base_height - base_spacing),
-                epaint::pos2(bar_offset + bar_width, rect.bottom() - base_height - base_spacing - bar_height),
+                epaint::pos2(rect.left() + bar_width * number.0 as f32, rect.bottom() - base_height - base_spacing),
+                epaint::pos2(rect.left() + bar_width * (number.0 + 1) as f32, rect.bottom() - base_height - base_spacing - bar_height),
             ),
             epaint::Rounding::ZERO,
             epaint::Color32::WHITE,
@@ -196,7 +194,7 @@ fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, bar_spac
 
 fn generate_filled_in<T>(list: &[Vec<T>]) -> Vec<bool> {
     let mut result = list.iter().flat_map(|v| {
-        let mut v = vec![true; v.len() * 4];
+        let mut v = vec![true; v.len()];
         v.push(false);
         v
     });
