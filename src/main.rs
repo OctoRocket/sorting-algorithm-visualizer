@@ -2,7 +2,10 @@ mod sorting_algorithms;
 
 use rand::prelude::*;
 
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time,
+};
 use eframe::egui::{self, epaint};
 use sorting_algorithms::SortingAlgorithm;
 
@@ -48,11 +51,21 @@ fn get_icon() -> egui::IconData {
 }
 
 struct ProgramState<T: Ord> {
+    // Lists
     list: Vec<Vec<T>>,
     sorted_list: Vec<T>,
+
+    // The algorithm and etc
     algorithm: Option<Box<dyn SortingAlgorithm>>,
+    delay: time::Duration,
+
+    // State bools
     running: bool,
     sorted: bool,
+
+    // Timers
+    time_of_last_step: time::SystemTime,
+    sorted_animation_time: f64,
 }
 
 impl ProgramState<usize> {
@@ -78,6 +91,78 @@ impl ProgramState<usize> {
 
         self.sorted = false;
     }
+
+    fn draw_graph(&self) -> Box<dyn FnOnce(&mut egui::Ui) + '_> {
+        Box::new(move |ui| {
+            ui.ctx().request_repaint();
+
+            // x and y of the desired size of the frame is 1 times the width and 0.35
+            // times the width respectively.
+            let desired_size = ui.available_width() * egui::vec2(1.0, 0.35);
+            let (_id, rect) = ui.allocate_space(desired_size);
+
+            let bars = self.make_bars(rect, &self.list, 10.0, 10.0, ui.ctx());
+
+            ui.painter().extend(bars);
+        })
+    }
+
+    fn make_bars(&self, rect: egui::Rect, list: &[Vec<usize>], base_height: f32, base_spacing: f32, ctx: &egui::Context) -> Vec<epaint::Shape> {
+        let mut bars = vec![];
+        let max_height = rect.height() - base_height - 25.0;
+
+        let filled_in = list.iter()
+            .map(|l| vec![true; l.len()])
+            .collect::<Vec<Vec<bool>>>()
+            .join(&[false][..]);
+        let bar_width = rect.width() / filled_in.len() as f32;
+        let mut color_index = 0;
+        for slot in filled_in.iter().enumerate() {
+            if *slot.1 {
+                let color = if list.len() == 1 {
+                    epaint::Color32::DARK_GRAY
+                } else {
+                    BAR_COLORS[color_index % BAR_COLORS.len()]
+                };
+
+                let base = epaint::Shape::rect_filled(epaint::Rect::from_two_pos(
+                    epaint::pos2(rect.left() + slot.0 as f32 * bar_width, rect.bottom()),
+                    epaint::pos2(rect.left() + (slot.0 + 1) as f32 * bar_width, rect.bottom() - base_height),
+                ), 0.0, color);
+
+                bars.push(base);
+            } else {
+                color_index += 1;
+            }
+        }
+
+        if list.is_empty() {
+            return bars;
+        }
+
+        let max_value = *list.iter().flatten().max().unwrap_or(&0) as f32;
+        let min_value = list.iter().flatten().min().unwrap_or(&0).saturating_sub(1) as f32;
+        for number in list.join(&[min_value as usize][..]).into_iter().enumerate() {
+            let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
+            let color = if ctx.input(|i| i.time) - self.sorted_animation_time < 0.25 {
+                epaint::Color32::LIGHT_GREEN
+            } else {
+                epaint::Color32::WHITE
+            };
+
+            let bar = epaint::Shape::rect_filled(
+                egui::Rect::from_two_pos(
+                    epaint::pos2(rect.left() + bar_width * number.0 as f32, rect.bottom() - base_height - base_spacing),
+                    epaint::pos2(rect.left() + bar_width * (number.0 + 1) as f32, rect.bottom() - base_height - base_spacing - bar_height),
+                ),
+                epaint::Rounding::ZERO,
+                color,
+            );
+            bars.push(bar);
+        }
+
+        bars
+    }
 }
 
 impl Default for ProgramState<usize> {
@@ -85,9 +170,15 @@ impl Default for ProgramState<usize> {
         Self {
             list: vec![],
             sorted_list: vec![],
+
             algorithm: None,
+            delay: time::Duration::from_millis(100),
+
             running: false,
             sorted: false,
+
+            time_of_last_step: time::UNIX_EPOCH,
+            sorted_animation_time: -1000.0,
         }
     }
 }
@@ -103,6 +194,7 @@ impl eframe::App for ProgramState<usize> {
                 for algorithm in sorting_algorithms::get_available_algorithms() {
                     if ui.button(algorithm.get_name()).clicked() {
                         self.list = algorithm.get_list().to_vec();
+                        self.delay = algorithm.get_delay();
                         self.algorithm = Some(algorithm);
                     }
                 }
@@ -165,15 +257,30 @@ impl eframe::App for ProgramState<usize> {
                         }
                     }
                 });
+                ui.horizontal(|ui| {
+                    let mut delay = self.delay.as_millis() as u64;
+                    ui.label("Time between steps:");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                        ui.add(egui::DragValue::new(&mut delay).speed(0.25));
+                    });
+
+                    if delay != self.delay.as_millis() as u64 {
+                        self.delay = time::Duration::from_millis(delay);
+
+                        if let Some(algorithm) = &mut self.algorithm {
+                            algorithm.set_list(self.list.clone());
+                        }
+                    }
+                });
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
-                ui.add_space(35.0);
+                ui.add_space(25.0);
                 ui.heading("Sorting Algorithm Visualizer");
             });
-            ui.centered_and_justified(draw_graph(self.list.clone()));
+            ui.centered_and_justified(self.draw_graph());
         });
 
         // Updating logic
@@ -181,78 +288,20 @@ impl eframe::App for ProgramState<usize> {
             self.list.clone_from(algorithm.get_list());
         }
         let mut flat_list = self.list.clone().into_iter().flatten().collect::<Vec<usize>>();
-        if flat_list == self.sorted_list {
+        if !self.sorted && flat_list == self.sorted_list {
             self.sorted = true;
+            self.running = false;
+            self.sorted_animation_time = ctx.input(|i| i.time);
         } else if flat_list.len() != self.sorted_list.len() {
             flat_list.sort_unstable();
             self.sorted_list = flat_list;
         }
-    }
-}
 
-fn draw_graph(list: Vec<Vec<usize>>) -> Box<dyn FnOnce(&mut egui::Ui)> {
-    Box::new(move |ui| {
-        ui.ctx().request_repaint();
-
-        // x and y of the desired size of the frame is 1 times the width and 0.35
-        // times the width respectively.
-        let desired_size = ui.available_width() * egui::vec2(1.0, 0.35);
-        let (_id, rect) = ui.allocate_space(desired_size);
-
-        let bars = make_bars(rect, list, 10.0, 10.0);
-
-        ui.painter().extend(bars);
-    })
-}
-
-fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, base_spacing: f32) -> Vec<epaint::Shape> {
-    let mut bars = vec![];
-    let max_height = rect.height() - base_height - 25.0;
-
-    let filled_in = list.iter()
-        .map(|l| vec![true; l.len()])
-        .collect::<Vec<Vec<bool>>>()
-        .join(&[false][..]);
-    let bar_width = rect.width() / filled_in.len() as f32;
-    let mut color_index = 0;
-    for slot in filled_in.iter().enumerate() {
-        if *slot.1 {
-            let color = if list.len() == 1 {
-                epaint::Color32::DARK_GRAY
-            } else {
-                BAR_COLORS[color_index % BAR_COLORS.len()]
-            };
-
-            let base = epaint::Shape::rect_filled(epaint::Rect::from_two_pos(
-                epaint::pos2(rect.left() + slot.0 as f32 * bar_width, rect.bottom()),
-                epaint::pos2(rect.left() + (slot.0 + 1) as f32 * bar_width, rect.bottom() - base_height),
-            ), 0.0, color);
-
-            bars.push(base);
-        } else {
-            color_index += 1;
+        if let Some(algorithm) = &mut self.algorithm {
+            if self.running && time::SystemTime::now().duration_since(self.time_of_last_step).unwrap() > self.delay {
+                self.time_of_last_step = time::SystemTime::now();
+                algorithm.step();
+            }
         }
     }
-
-    if list.is_empty() {
-        return bars;
-    }
-
-    let max_value = *list.iter().flatten().max().unwrap_or(&0) as f32;
-    let min_value = list.iter().flatten().min().unwrap_or(&0).saturating_sub(1) as f32;
-    for number in list.join(&[min_value as usize][..]).into_iter().enumerate() {
-        let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
-
-        let bar = epaint::Shape::rect_filled(
-            egui::Rect::from_two_pos(
-                epaint::pos2(rect.left() + bar_width * number.0 as f32, rect.bottom() - base_height - base_spacing),
-                epaint::pos2(rect.left() + bar_width * (number.0 + 1) as f32, rect.bottom() - base_height - base_spacing - bar_height),
-            ),
-            epaint::Rounding::ZERO,
-            epaint::Color32::WHITE,
-        );
-        bars.push(bar);
-    }
-
-    bars
 }

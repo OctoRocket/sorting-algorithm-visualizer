@@ -1,11 +1,13 @@
 use super::SortingAlgorithm;
 
+use std::time;
 use rand::prelude::*;
 
 #[derive(Clone)]
 pub struct BogoSort {
     // Statics, defaulted by the sorting algorithm and kept that way
     name: &'static str,
+    default_delay: time::Duration,
 
     // Mutables, these change as the sorting algorithm works.
     current_list: Vec<Vec<usize>>,
@@ -16,6 +18,7 @@ impl Default for BogoSort {
     fn default() -> Self {
         Self {
             name: "Bogo Sort",
+            default_delay: time::Duration::from_millis(40),
             current_list: vec![(1..=4).collect()],
             rng: rand::thread_rng(),
         }
@@ -37,5 +40,9 @@ impl SortingAlgorithm for BogoSort {
 
     fn step(&mut self) {
         self.current_list.get_mut(0).unwrap().shuffle(&mut self.rng);
+    }
+
+    fn get_delay(&self) -> std::time::Duration {
+        self.default_delay
     }
 }
