@@ -6,11 +6,19 @@ use std::sync::Arc;
 use eframe::egui::{self, epaint};
 use sorting_algorithms::SortingAlgorithm;
 
-const BAR_COLORS: [epaint::Color32; 4] = [
+const BAR_COLORS: [epaint::Color32; 12] = [
+    epaint::Color32::DARK_RED,
     epaint::Color32::RED,
+    epaint::Color32::LIGHT_RED,
+    epaint::Color32::BROWN,
     epaint::Color32::YELLOW,
+    epaint::Color32::GOLD,
+    epaint::Color32::DARK_GREEN,
     epaint::Color32::GREEN,
+    epaint::Color32::LIGHT_GREEN,
+    epaint::Color32::DARK_BLUE,
     epaint::Color32::BLUE,
+    epaint::Color32::LIGHT_BLUE,
 ];
 
 fn main() -> eframe::Result {
@@ -27,7 +35,6 @@ fn main() -> eframe::Result {
     eframe::run_native("Sorting Algorithm Visualizer", options, Box::new(|cc| Ok(Box::new(ProgramState::new(cc)))))
 }
 
-
 fn get_icon() -> egui::IconData {
     let icon = include_bytes!("../icon.png");
     let image = image::load_from_memory(icon).unwrap().to_rgba8();
@@ -42,7 +49,10 @@ fn get_icon() -> egui::IconData {
 
 struct ProgramState<T: Ord> {
     list: Vec<Vec<T>>,
+    sorted_list: Vec<T>,
     algorithm: Option<Box<dyn SortingAlgorithm>>,
+    running: bool,
+    sorted: bool,
 }
 
 impl ProgramState<usize> {
@@ -65,16 +75,19 @@ impl ProgramState<usize> {
         if let Some(algorithm) = &mut self.algorithm {
             algorithm.set_list(self.list.clone())
         }
+
+        self.sorted = false;
     }
 }
 
 impl Default for ProgramState<usize> {
     fn default() -> Self {
-        let algorithm = None;
-
         Self {
             list: vec![],
-            algorithm,
+            sorted_list: vec![],
+            algorithm: None,
+            running: false,
+            sorted: false,
         }
     }
 }
@@ -98,23 +111,60 @@ impl eframe::App for ProgramState<usize> {
 
         egui::SidePanel::left(egui::Id::new("settings panel")).resizable(false).show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
-                ui.heading("Settings");
+                ui.add_space(8.0);
+                ui.heading("Controls");
                 ui.add_space(15.0);
+
+                // Buttons
+                ui.horizontal(|ui| {
+                    let button_size = egui::vec2(ui.available_width() / 3.0 - ui.spacing().button_padding.x * 1.35, 0.0);
+                    if ui.add(egui::Button::new("Play").min_size(button_size)).clicked() && !self.sorted {
+                        self.running = true;
+                    }
+                    if ui.add(egui::Button::new("Step").min_size(button_size)).clicked() && !self.sorted {
+                        self.running = false;
+
+                        if let Some(ref mut algorithm) = &mut self.algorithm {
+                            algorithm.step();
+                        }
+                    }
+                    if ui.add(egui::Button::new("Pause").min_size(button_size)).clicked() && !self.sorted {
+                        self.running = false;
+                    }
+                });
                 if ui.button("Shuffle").clicked() {
                     self.shuffle();
                 }
-                if ui.button("TEST").clicked() {
-                    self.list = vec![vec![4, 2], vec![1, 3]];
-                }
+
+                // Draw seperating bar
+                ui.add_space(10.0);
+                let bar_height = 1.0;
+                let rect = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width(), bar_height),
+                    egui::Sense::hover(),
+                ).0;
+                ui.painter().add(epaint::Shape::rect_filled(rect, 0.0, epaint::Color32::DARK_GRAY));
+                ui.add_space(10.0);
+
+                ui.heading("Settings");
+                ui.add_space(10.0);
+
+                // Sliders
                 ui.horizontal(|ui| {
                     let mut length = self.list.iter().flatten().count();
                     ui.label("List length: ");
-                    ui.add(egui::DragValue::new(&mut length));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                        ui.add(egui::DragValue::new(&mut length).speed(0.05));
+                    });
 
                     if self.list.iter().flatten().count() != length {
                         self.list = vec![(1..=length).collect()];
+
+                        if let Some(algorithm) = &mut self.algorithm {
+                            algorithm.set_list(self.list.clone());
+                        }
                     }
-                })
+                });
             });
         });
 
@@ -125,6 +175,18 @@ impl eframe::App for ProgramState<usize> {
             });
             ui.centered_and_justified(draw_graph(self.list.clone()));
         });
+
+        // Updating logic
+        if let Some(algorithm) = &self.algorithm {
+            self.list.clone_from(algorithm.get_list());
+        }
+        let mut flat_list = self.list.clone().into_iter().flatten().collect::<Vec<usize>>();
+        if flat_list == self.sorted_list {
+            self.sorted = true;
+        } else if flat_list.len() != self.sorted_list.len() {
+            flat_list.sort_unstable();
+            self.sorted_list = flat_list;
+        }
     }
 }
 
@@ -147,7 +209,10 @@ fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, base_spa
     let mut bars = vec![];
     let max_height = rect.height() - base_height - 25.0;
 
-    let filled_in = generate_filled_in(&list);
+    let filled_in = list.iter()
+        .map(|l| vec![true; l.len()])
+        .collect::<Vec<Vec<bool>>>()
+        .join(&[false][..]);
     let bar_width = rect.width() / filled_in.len() as f32;
     let mut color_index = 0;
     for slot in filled_in.iter().enumerate() {
@@ -190,14 +255,4 @@ fn make_bars(rect: egui::Rect, list: Vec<Vec<usize>>, base_height: f32, base_spa
     }
 
     bars
-}
-
-fn generate_filled_in<T>(list: &[Vec<T>]) -> Vec<bool> {
-    let mut result = list.iter().flat_map(|v| {
-        let mut v = vec![true; v.len()];
-        v.push(false);
-        v
-    });
-    result.next_back();
-    result.collect()
 }
