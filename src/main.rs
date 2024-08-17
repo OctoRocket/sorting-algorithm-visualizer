@@ -1,12 +1,18 @@
-mod sorting_algorithms;
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+)]
 
-use rand::prelude::*;
+mod sorting_algorithms;
 
 use std::{
     sync::Arc,
     time,
 };
 use eframe::egui::{self, epaint};
+use rand::prelude::*;
 use sorting_algorithms::SortingAlgorithm;
 
 const BAR_COLORS: [epaint::Color32; 12] = [
@@ -86,7 +92,7 @@ impl ProgramState<usize> {
         self.list = vec![new_list];
 
         if let Some(algorithm) = &mut self.algorithm {
-            algorithm.set_list(self.list.clone())
+            algorithm.set_list(self.list.clone());
         }
 
         self.sorted = false;
@@ -126,8 +132,8 @@ impl ProgramState<usize> {
                 };
 
                 let base = epaint::Shape::rect_filled(epaint::Rect::from_two_pos(
-                    epaint::pos2(rect.left() + slot.0 as f32 * bar_width, rect.bottom()),
-                    epaint::pos2(rect.left() + (slot.0 + 1) as f32 * bar_width, rect.bottom() - base_height),
+                    epaint::pos2((slot.0 as f32).mul_add(bar_width, rect.left()), rect.bottom()),
+                    epaint::pos2(((slot.0 + 1) as f32).mul_add(bar_width, rect.left()), rect.bottom() - base_height),
                 ), 0.0, color);
 
                 bars.push(base);
@@ -152,8 +158,8 @@ impl ProgramState<usize> {
 
             let bar = epaint::Shape::rect_filled(
                 egui::Rect::from_two_pos(
-                    epaint::pos2(rect.left() + bar_width * number.0 as f32, rect.bottom() - base_height - base_spacing),
-                    epaint::pos2(rect.left() + bar_width * (number.0 + 1) as f32, rect.bottom() - base_height - base_spacing - bar_height),
+                    epaint::pos2(bar_width.mul_add(number.0 as f32, rect.left()), rect.bottom() - base_height - base_spacing),
+                    epaint::pos2(bar_width.mul_add((number.0 + 1) as f32, rect.left()), rect.bottom() - base_height - base_spacing - bar_height),
                 ),
                 epaint::Rounding::ZERO,
                 color,
@@ -183,6 +189,7 @@ impl Default for ProgramState<usize> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 impl eframe::App for ProgramState<usize> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::SidePanel::right(egui::Id::new("algorithm selection panel")).resizable(false).show(ctx, |ui| {
@@ -193,7 +200,7 @@ impl eframe::App for ProgramState<usize> {
 
                 for algorithm in sorting_algorithms::get_available_algorithms() {
                     if ui.button(algorithm.get_name()).clicked() {
-                        self.list = algorithm.get_list().to_vec();
+                        self.list = algorithm.get_list().into_iter().collect();
                         self.delay = algorithm.get_delay();
                         self.algorithm = Some(algorithm);
                     }
@@ -209,7 +216,7 @@ impl eframe::App for ProgramState<usize> {
 
                 // Buttons
                 ui.horizontal(|ui| {
-                    let button_size = egui::vec2(ui.available_width() / 3.0 - ui.spacing().button_padding.x * 1.35, 0.0);
+                    let button_size = egui::vec2(ui.spacing().button_padding.x.mul_add(-1.35, ui.available_width() / 3.0), 0.0);
                     if ui.add(egui::Button::new("Play").min_size(button_size)).clicked() && !self.sorted {
                         self.running = true;
                     }
@@ -285,7 +292,7 @@ impl eframe::App for ProgramState<usize> {
 
         // Updating logic
         if let Some(algorithm) = &self.algorithm {
-            self.list.clone_from(algorithm.get_list());
+            self.list = algorithm.get_list().into_iter().collect();
         }
         let mut flat_list = self.list.clone().into_iter().flatten().collect::<Vec<usize>>();
         if !self.sorted && flat_list == self.sorted_list {
