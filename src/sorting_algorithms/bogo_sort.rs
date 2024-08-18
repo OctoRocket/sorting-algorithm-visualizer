@@ -30,8 +30,8 @@ impl SortingAlgorithm for BogoSort {
         self.name
     }
 
-    fn get_list(&self) -> Vec<Vec<usize>> {
-        self.current_list.clone()
+    fn get_list(&self) -> (Vec<Vec<usize>>, Vec<(usize, usize)>) {
+        (self.current_list.clone(), vec![])
     }
 
     fn set_list(&mut self, list: Vec<Vec<usize>>) {

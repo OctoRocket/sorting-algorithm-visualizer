@@ -48,15 +48,33 @@ impl SortingAlgorithm for MergeSort {
         self.name
     }
 
-    fn get_list(&self) -> Vec<Vec<usize>> {
-        self.merge_tree
-            .flatten()
+    fn get_list(&self) -> (Vec<Vec<usize>>, Vec<(usize, usize)>) {
+        let flattened_tree = self.merge_tree.flatten();
+        let (
+            lists,
+            sortednesses,
+        ): (Vec<Vec<usize>>, Vec<bool>) = flattened_tree
             .into_iter()
-            .map(|tree| if let MergeTree::Leaf(list, ..) = tree {
-                list
-            } else {
-                unreachable!()
-            }).collect()
+            .map(|tree| {
+                let MergeTree::Leaf(list, sorted) = tree else { panic!("Somehow this is a branch") };
+                (list, sorted)
+            })
+            .unzip();
+
+        let first_unsorted = sortednesses
+            .windows(2)
+            .enumerate()
+            .filter(|window| window.1[0] && !window.1[1])
+            .map(|(index, _)| index)
+            .next()
+            .unwrap_or(0);
+
+        let mut indexes = vec![];
+        for index in &lists[first_unsorted] {
+            indexes.push((first_unsorted, *index));
+        }
+
+        (lists, indexes)
     }
 
     fn set_list(&mut self, list: Vec<Vec<usize>>) {

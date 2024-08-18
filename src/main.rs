@@ -113,7 +113,14 @@ impl ProgramState<usize> {
         })
     }
 
-    fn make_bars(&self, rect: egui::Rect, list: &[Vec<usize>], base_height: f32, base_spacing: f32, ctx: &egui::Context) -> Vec<epaint::Shape> {
+    fn make_bars(
+        &self,
+        rect: egui::Rect,
+        list: &[Vec<usize>],
+        base_height: f32,
+        base_spacing: f32,
+        ctx: &egui::Context,
+    ) -> Vec<epaint::Shape> {
         let mut bars = vec![];
         let max_height = rect.height() - base_height - 25.0;
 
@@ -200,7 +207,7 @@ impl eframe::App for ProgramState<usize> {
 
                 for algorithm in sorting_algorithms::get_available_algorithms() {
                     if ui.button(algorithm.get_name()).clicked() {
-                        self.list = algorithm.get_list().into_iter().collect();
+                        self.list = algorithm.get_list().0.into_iter().collect();
                         self.delay = algorithm.get_delay();
                         self.algorithm = Some(algorithm);
                     }
@@ -290,25 +297,34 @@ impl eframe::App for ProgramState<usize> {
             ui.centered_and_justified(self.draw_graph());
         });
 
-        // Updating logic
-        if let Some(algorithm) = &self.algorithm {
-            self.list = algorithm.get_list().into_iter().collect();
-        }
-        let mut flat_list = self.list.clone().into_iter().flatten().collect::<Vec<usize>>();
-        if !self.sorted && flat_list == self.sorted_list {
-            self.sorted = true;
-            self.running = false;
-            self.sorted_animation_time = ctx.input(|i| i.time);
-        } else if flat_list.len() != self.sorted_list.len() {
-            flat_list.sort_unstable();
-            self.sorted_list = flat_list;
-        }
+        // Things that need to be updated every frame (e.g. checking if the list
+        // is sorted (maybe should be moved so the sorting algorithm says when
+        // the list is sorted), updating the program state's list to be in sync
+        // with the algorithm's list (maybe should just be an empty algorithm?),
+        // etc)
+        frame_update(self, ctx);
+    }
+}
 
-        if let Some(algorithm) = &mut self.algorithm {
-            if self.running && time::SystemTime::now().duration_since(self.time_of_last_step).unwrap() > self.delay {
-                self.time_of_last_step = time::SystemTime::now();
-                algorithm.step();
-            }
+// Updating logic
+fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
+    if let Some(algorithm) = &state.algorithm {
+        state.list = algorithm.get_list().0.into_iter().collect();
+    }
+    let mut flat_list = state.list.clone().into_iter().flatten().collect::<Vec<usize>>();
+    if !state.sorted && flat_list == state.sorted_list {
+        state.sorted = true;
+        state.running = false;
+        state.sorted_animation_time = ctx.input(|i| i.time);
+    } else if flat_list.len() != state.sorted_list.len() {
+        flat_list.sort_unstable();
+        state.sorted_list = flat_list;
+    }
+
+    if let Some(algorithm) = &mut state.algorithm {
+        if state.running && time::SystemTime::now().duration_since(state.time_of_last_step).unwrap() > state.delay {
+            state.time_of_last_step = time::SystemTime::now();
+            algorithm.step();
         }
     }
 }

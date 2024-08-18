@@ -14,8 +14,9 @@ pub trait SortingAlgorithm {
     /// Get the name of the sorting algorithm.
     fn get_name(&self) -> &str;
 
-    /// Get the list state of the sorting algorithm.
-    fn get_list(&self) -> Vec<Vec<usize>>;
+    /// Get the list state of the sorting algorithm and a list of indexes that
+    /// should be highlighted.
+    fn get_list(&self) -> (Vec<Vec<usize>>, Vec<(usize, usize)>);
 
     /// Set the list state of the sorting algorithm.
     fn set_list(&mut self, list: Vec<Vec<usize>>);
