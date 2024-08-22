@@ -60,6 +60,7 @@ struct ProgramState<T: Ord> {
     // Lists
     list: Vec<Vec<T>>,
     sorted_list: Vec<T>,
+    highlights: Vec<(usize, usize)>,
 
     // The algorithm and etc
     algorithm: Option<Box<dyn SortingAlgorithm>>,
@@ -183,6 +184,7 @@ impl Default for ProgramState<usize> {
         Self {
             list: vec![],
             sorted_list: vec![],
+            highlights: vec![],
 
             algorithm: None,
             delay: time::Duration::from_millis(100),
@@ -196,99 +198,13 @@ impl Default for ProgramState<usize> {
     }
 }
 
-#[allow(clippy::too_many_lines)]
 impl eframe::App for ProgramState<usize> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::SidePanel::right(egui::Id::new("algorithm selection panel")).resizable(false).show(ctx, |ui| {
-            ui.vertical_centered_justified(|ui| {
-                ui.add_space(8.0);
-                ui.heading("Choose the Agorithm");
-                ui.add_space(15.0);
+        draw_algorithm_selection(self, ctx);
 
-                for algorithm in sorting_algorithms::get_available_algorithms() {
-                    if ui.button(algorithm.get_name()).clicked() {
-                        self.list = algorithm.get_list().0.into_iter().collect();
-                        self.delay = algorithm.get_delay();
-                        self.algorithm = Some(algorithm);
-                    }
-                }
-            });
-        });
+        draw_settings_panel(self, ctx);
 
-        egui::SidePanel::left(egui::Id::new("settings panel")).resizable(false).show(ctx, |ui| {
-            ui.vertical_centered_justified(|ui| {
-                ui.add_space(8.0);
-                ui.heading("Controls");
-                ui.add_space(15.0);
-
-                // Buttons
-                ui.horizontal(|ui| {
-                    let button_size = egui::vec2(ui.spacing().button_padding.x.mul_add(-1.35, ui.available_width() / 3.0), 0.0);
-                    if ui.add(egui::Button::new("Play").min_size(button_size)).clicked() && !self.sorted {
-                        self.running = true;
-                    }
-                    if ui.add(egui::Button::new("Step").min_size(button_size)).clicked() && !self.sorted {
-                        self.running = false;
-
-                        if let Some(ref mut algorithm) = &mut self.algorithm {
-                            algorithm.step();
-                        }
-                    }
-                    if ui.add(egui::Button::new("Pause").min_size(button_size)).clicked() && !self.sorted {
-                        self.running = false;
-                    }
-                });
-                if ui.button("Shuffle").clicked() {
-                    self.shuffle();
-                }
-
-                // Draw seperating bar
-                ui.add_space(10.0);
-                let bar_height = 1.0;
-                let rect = ui.allocate_exact_size(
-                    egui::vec2(ui.available_width(), bar_height),
-                    egui::Sense::hover(),
-                ).0;
-                ui.painter().add(epaint::Shape::rect_filled(rect, 0.0, epaint::Color32::DARK_GRAY));
-                ui.add_space(10.0);
-
-                ui.heading("Settings");
-                ui.add_space(10.0);
-
-                // Sliders
-                ui.horizontal(|ui| {
-                    let mut length = self.list.iter().flatten().count();
-                    ui.label("List length: ");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
-                        ui.add(egui::DragValue::new(&mut length).speed(0.05));
-                    });
-
-                    if self.list.iter().flatten().count() != length {
-                        self.list = vec![(1..=length).collect()];
-
-                        if let Some(algorithm) = &mut self.algorithm {
-                            algorithm.set_list(self.list.clone());
-                        }
-                    }
-                });
-                ui.horizontal(|ui| {
-                    let mut delay = self.delay.as_millis() as u64;
-                    ui.label("Time between steps:");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
-                        ui.add(egui::DragValue::new(&mut delay).speed(0.25));
-                    });
-
-                    if delay != self.delay.as_millis() as u64 {
-                        self.delay = time::Duration::from_millis(delay);
-
-                        if let Some(algorithm) = &mut self.algorithm {
-                            algorithm.set_list(self.list.clone());
-                        }
-                    }
-                });
-            });
-        });
-
+        // Use the rest of the space in the middle to show the actual graph
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
                 ui.add_space(25.0);
@@ -304,6 +220,102 @@ impl eframe::App for ProgramState<usize> {
         // etc)
         frame_update(self, ctx);
     }
+}
+
+// Draw right panel
+fn draw_algorithm_selection(state: &mut ProgramState<usize>, ctx: &egui::Context) {
+    egui::SidePanel::right(egui::Id::new("algorithm selection panel")).resizable(false).show(ctx, |ui| {
+        ui.vertical_centered_justified(|ui| {
+            ui.add_space(8.0);
+            ui.heading("Choose the Agorithm");
+            ui.add_space(15.0);
+
+            for algorithm in sorting_algorithms::get_available_algorithms() {
+                if ui.button(algorithm.get_name()).clicked() {
+                    state.list = algorithm.get_list().0.into_iter().collect();
+                    state.delay = algorithm.get_delay();
+                    state.algorithm = Some(algorithm);
+                }
+            }
+        });
+    });
+}
+
+// Draw the left panel
+fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
+    egui::SidePanel::left(egui::Id::new("settings panel")).resizable(false).show(ctx, |ui| {
+        ui.vertical_centered_justified(|ui| {
+            ui.add_space(8.0);
+            ui.heading("Controls");
+            ui.add_space(15.0);
+
+            // Buttons
+            ui.horizontal(|ui| {
+                let button_size = egui::vec2(ui.spacing().button_padding.x.mul_add(-1.35, ui.available_width() / 3.0), 0.0);
+                if ui.add(egui::Button::new("Play").min_size(button_size)).clicked() && !state.sorted {
+                    state.running = true;
+                }
+                if ui.add(egui::Button::new("Step").min_size(button_size)).clicked() && !state.sorted {
+                    state.running = false;
+
+                    if let Some(ref mut algorithm) = &mut state.algorithm {
+                        algorithm.step();
+                    }
+                }
+                if ui.add(egui::Button::new("Pause").min_size(button_size)).clicked() && !state.sorted {
+                    state.running = false;
+                }
+            });
+            if ui.button("Shuffle").clicked() {
+                state.shuffle();
+            }
+
+            // Draw seperating bar
+            ui.add_space(10.0);
+            let bar_height = 1.0;
+            let rect = ui.allocate_exact_size(
+                egui::vec2(ui.available_width(), bar_height),
+                egui::Sense::hover(),
+            ).0;
+            ui.painter().add(epaint::Shape::rect_filled(rect, 0.0, epaint::Color32::DARK_GRAY));
+            ui.add_space(10.0);
+
+            ui.heading("Settings");
+            ui.add_space(10.0);
+
+            // Sliders
+            ui.horizontal(|ui| {
+                let mut length = state.list.iter().flatten().count();
+                ui.label("List length: ");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                    ui.add(egui::DragValue::new(&mut length).speed(0.05));
+                });
+
+                if state.list.iter().flatten().count() != length {
+                    state.list = vec![(1..=length).collect()];
+
+                    if let Some(algorithm) = &mut state.algorithm {
+                        algorithm.set_list(state.list.clone());
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                let mut delay = state.delay.as_millis() as u64;
+                ui.label("Time between steps:");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                    ui.add(egui::DragValue::new(&mut delay).speed(0.25));
+                });
+
+                if delay != state.delay.as_millis() as u64 {
+                    state.delay = time::Duration::from_millis(delay);
+
+                    if let Some(algorithm) = &mut state.algorithm {
+                        algorithm.set_list(state.list.clone());
+                    }
+                }
+            });
+        });
+    });
 }
 
 // Updating logic
@@ -325,6 +337,7 @@ fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
         if state.running && time::SystemTime::now().duration_since(state.time_of_last_step).unwrap() > state.delay {
             state.time_of_last_step = time::SystemTime::now();
             algorithm.step();
+            state.highlights = algorithm.get_list().1;
         }
     }
 }
