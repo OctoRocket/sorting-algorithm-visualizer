@@ -106,7 +106,7 @@ impl ProgramState<usize> {
             // x and y of the desired size of the frame is 1 times the width and 0.35
             // times the width respectively.
             let desired_size = ui.available_width() * egui::vec2(1.0, 0.35);
-            let (_id, rect) = ui.allocate_space(desired_size);
+            let (_, rect) = ui.allocate_space(desired_size);
 
             let bars = self.make_bars(rect, &self.list, 10.0, 10.0, ui.ctx());
 
@@ -156,10 +156,32 @@ impl ProgramState<usize> {
 
         let max_value = *list.iter().flatten().max().unwrap_or(&0) as f32;
         let min_value = list.iter().flatten().min().unwrap_or(&0).saturating_sub(1) as f32;
+        let list_directory = list
+            .iter()
+            .map(|v| 0..v.len())
+            .scan(0, |len, list| {
+                let new_list = list
+                    .clone()
+                    .map(|i| i + *len)
+                    .collect::<Vec<_>>();
+                *len += list.len() + 1; // Add one to account for the 0 values
+                                        // in between
+                Some(new_list)
+            })
+            .collect::<Vec<_>>();
+        let highlight_indices = self.highlights
+            .iter()
+            // If there is an error here you probably set your highlights up
+            // wrong
+            .map(|(first_index, second_index)| list_directory[*first_index][*second_index])
+            .collect::<Vec<_>>();
+
         for number in list.join(&[min_value as usize][..]).into_iter().enumerate() {
             let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
             let color = if ctx.input(|i| i.time) - self.sorted_animation_time < 0.25 {
                 epaint::Color32::LIGHT_GREEN
+            } else if highlight_indices.contains(&number.0) {
+                epaint::Color32::LIGHT_RED
             } else {
                 epaint::Color32::WHITE
             };
@@ -322,6 +344,11 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
 fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
     if let Some(algorithm) = &state.algorithm {
         state.list = algorithm.get_list().0.into_iter().collect();
+        state.highlights = if state.running {
+            algorithm.get_list().1
+        } else {
+            vec![]
+        };
     }
     let mut flat_list = state.list.clone().into_iter().flatten().collect::<Vec<usize>>();
     if !state.sorted && flat_list == state.sorted_list {
@@ -337,7 +364,6 @@ fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
         if state.running && time::SystemTime::now().duration_since(state.time_of_last_step).unwrap() > state.delay {
             state.time_of_last_step = time::SystemTime::now();
             algorithm.step();
-            state.highlights = algorithm.get_list().1;
         }
     }
 }

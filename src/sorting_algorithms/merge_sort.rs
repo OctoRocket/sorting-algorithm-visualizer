@@ -66,12 +66,13 @@ impl SortingAlgorithm for MergeSort {
             .enumerate()
             .filter(|window| window.1[0] && !window.1[1])
             .map(|(index, _)| index)
-            .next()
-            .unwrap_or(0);
+            .next();
 
         let mut indexes = vec![];
-        for index in &lists[first_unsorted] {
-            indexes.push((first_unsorted, *index));
+        if let Some(unsorted_index) = first_unsorted {
+            for index in 0..lists[unsorted_index].len() {
+                indexes.push((unsorted_index, index));
+            }
         }
 
         (lists, indexes)
