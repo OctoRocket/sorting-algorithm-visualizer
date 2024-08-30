@@ -1,21 +1,33 @@
 {
-  description = "Shell to add the wayland lib for building the project";
+  description = "Devenv for working with the project, as well as building the project";
 
-  inputs.nixpkgs.url = github:nixos/nixpkgs/nixpkgs-unstable;
-  outputs = { nixpkgs, ... }:
+  inputs = {
+    nixpkgs.url = github:nixos/nixpkgs/nixpkgs-unstable;
+    flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+  outputs = { nixpkgs, flake-utils, rust-overlay, ... }:
+
+  flake-utils.lib.eachDefaultSystem (system:
     let
-      system = "x86_64-linux";
       pkgs = import nixpkgs {
         inherit system;
+        overlays = [ rust-overlay.overlays.default ];
       };
     in {
-      devShells.${system}.default = pkgs.mkShell {
+      devShells.default = pkgs.mkShell rec {
         buildInputs = with pkgs; [
           libxkbcommon
           libGL
           wayland
+          rust-bin.stable.latest.default
         ];
-        LD_LIBRARY_PATH = "${pkgs.libxkbcommon}/lib:${pkgs.libGL}/lib:${pkgs.wayland}/lib";
+        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";
       };
-    };
+      packages.default = pkgs.callPackage ./default.nix {};
+    }
+  );
 }
