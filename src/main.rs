@@ -36,7 +36,6 @@ fn main() -> eframe::Result {
         .with_min_inner_size(egui::vec2(500.0, 300.0));
     let options = eframe::NativeOptions {
         viewport,
-        follow_system_theme: false,
         centered: true,
         ..Default::default()
     };
