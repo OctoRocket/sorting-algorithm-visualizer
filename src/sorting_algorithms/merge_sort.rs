@@ -19,7 +19,7 @@ enum MergeTree {
 }
 
 impl MergeTree {
-    fn new(list: Vec<usize>) -> Self {
+    const fn new(list: Vec<usize>) -> Self {
         Self::Leaf(list, false)
     }
 

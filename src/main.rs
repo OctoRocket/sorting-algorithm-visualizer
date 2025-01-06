@@ -68,6 +68,7 @@ struct ProgramState<T: Ord> {
     // State bools
     running: bool,
     sorted: bool,
+    show_hightlights: bool,
 
     // Timers
     time_of_last_step: time::SystemTime,
@@ -212,6 +213,7 @@ impl Default for ProgramState<usize> {
 
             running: false,
             sorted: false,
+            show_hightlights: true,
 
             time_of_last_step: time::UNIX_EPOCH,
             sorted_animation_time: -1000.0,
@@ -290,6 +292,9 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
             if ui.button("Shuffle").clicked() {
                 state.shuffle();
             }
+            if ui.button("Toggle Highlights").clicked() {
+                state.show_hightlights = !state.show_hightlights;
+            }
 
             // Draw seperating bar
             ui.add_space(10.0);
@@ -343,7 +348,7 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
 fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
     if let Some(algorithm) = &state.algorithm {
         state.list = algorithm.get_list().0.into_iter().collect();
-        state.highlights = if state.running {
+        state.highlights = if state.show_hightlights {
             algorithm.get_list().1
         } else {
             vec![]

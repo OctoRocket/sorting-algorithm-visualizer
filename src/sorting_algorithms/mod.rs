@@ -1,6 +1,6 @@
 pub mod bogo_sort;
 pub mod merge_sort;
-pub mod merge_in_place;
+// pub mod merge_in_place;
 
 use std::time;
 
@@ -8,7 +8,7 @@ pub fn get_available_algorithms() -> Vec<Box<dyn SortingAlgorithm>> {
     vec![
         Box::new(bogo_sort::BogoSort::default()),
         Box::new(merge_sort::MergeSort::default()),
-        Box::new(merge_in_place::MergeInPlace::default()),
+        // Box::new(merge_in_place::MergeInPlace::default()),
     ]
 }
 
