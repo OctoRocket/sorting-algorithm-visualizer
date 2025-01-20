@@ -171,16 +171,17 @@ impl ProgramState<usize> {
             .collect::<Vec<_>>();
         let highlight_indices = self.highlights
             .iter()
-            // If there is an error here you probably set your highlights up
-            // wrong
-            .map(|(first_index, second_index)| list_directory[*first_index][*second_index])
-            .collect::<Vec<_>>();
+            // Make the returned highlights usable and ensure they are all valid
+            .filter_map(|(first_index, second_index)| {
+                Some(*list_directory.get(*first_index)?.get(*second_index)?)
+            })
+            .collect::<Vec<usize>>();
 
         for number in list.join(&[min_value as usize][..]).into_iter().enumerate() {
             let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
             let color = if ctx.input(|i| i.time) - self.sorted_animation_time < 0.25 {
                 epaint::Color32::LIGHT_GREEN
-            } else if highlight_indices.contains(&number.0) {
+            } else if highlight_indices.contains(&number.0) && !self.sorted {
                 epaint::Color32::LIGHT_RED
             } else {
                 epaint::Color32::WHITE
