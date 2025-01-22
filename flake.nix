@@ -23,6 +23,8 @@
           libxkbcommon
           libGL
           wayland
+          alsa-lib
+          pkg-config
           (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
         ];
         LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";

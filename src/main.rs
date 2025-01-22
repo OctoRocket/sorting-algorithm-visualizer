@@ -9,10 +9,11 @@ mod sorting_algorithms;
 
 use std::{
     sync::Arc,
-    time,
+    time::{self, Duration},
 };
 use eframe::egui::{self, epaint};
 use rand::prelude::*;
+use rodio::{source, OutputStream, OutputStreamHandle, Source};
 use sorting_algorithms::SortingAlgorithm;
 
 const BAR_COLORS: [epaint::Color32; 12] = [
@@ -29,6 +30,8 @@ const BAR_COLORS: [epaint::Color32; 12] = [
     epaint::Color32::BLUE,
     epaint::Color32::LIGHT_BLUE,
 ];
+
+const SINE_WAVE_BOUNDS: (f32, f32) = (200.0, 600.0);
 
 fn main() -> eframe::Result {
     let viewport = egui::ViewportBuilder::default()
@@ -55,6 +58,8 @@ fn get_icon() -> egui::IconData {
     }
 }
 
+// This is messy, the compilier even says so, but it works well enough
+#[allow(clippy::struct_excessive_bools)]
 struct ProgramState<T: Ord> {
     // Lists
     list: Vec<Vec<T>>,
@@ -73,6 +78,14 @@ struct ProgramState<T: Ord> {
     // Timers
     time_of_last_step: time::SystemTime,
     sorted_animation_time: f64,
+
+    // Sound stream interfaces (may not be available if device doesn't have
+    // sound) and a bool that's true if sound has already been played this step.
+    // Sound stream needs to be kept around otherwise the output stream will be
+    // dropped.
+    _sound_stream: Option<OutputStream>,
+    sound_handle: Option<OutputStreamHandle>,
+    sound_already_played: bool,
 }
 
 impl ProgramState<usize> {
@@ -200,10 +213,25 @@ impl ProgramState<usize> {
 
         bars
     }
+
+    fn play_sine(&self, frequecy: f32) {
+        if let Some(handle) = &self.sound_handle {
+            // Will fail if audio setup is wrong. Fails silently
+            _ = handle.play_raw(source::SineWave::new(frequecy)
+                .take_duration(Duration::from_millis(50))
+                .amplify(0.65));
+        }
+    }
 }
 
 impl Default for ProgramState<usize> {
     fn default() -> Self {
+        let (sound_stream, sound_handle) = if let Ok(output) = OutputStream::try_default() {
+            (Some(output.0), Some(output.1))
+        } else {
+            (None, None)
+        };
+
         Self {
             list: vec![],
             sorted_list: vec![],
@@ -218,6 +246,10 @@ impl Default for ProgramState<usize> {
 
             time_of_last_step: time::UNIX_EPOCH,
             sorted_animation_time: -1000.0,
+
+            _sound_stream: sound_stream,
+            sound_handle,
+            sound_already_played: true,
         }
     }
 }
@@ -284,6 +316,7 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
 
                     if let Some(ref mut algorithm) = &mut state.algorithm {
                         algorithm.step();
+                        state.sound_already_played = false;
                     }
                 }
                 if ui.add(egui::Button::new("Pause").min_size(button_size)).clicked() && !state.sorted {
@@ -369,6 +402,19 @@ fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
         if state.running && time::SystemTime::now().duration_since(state.time_of_last_step).unwrap() > state.delay {
             state.time_of_last_step = time::SystemTime::now();
             algorithm.step();
+            state.sound_already_played = false;
         }
+    }
+
+    if !state.sound_already_played {
+        if let Some(first_highlight) = state.highlights.get(1) {
+            let number = state.list[first_highlight.0][first_highlight.1] as f32;
+            let ratio_of_max = number / *state.sorted_list.iter().max().unwrap() as f32;
+            let frequency = (SINE_WAVE_BOUNDS.1 - SINE_WAVE_BOUNDS.0).mul_add(ratio_of_max, SINE_WAVE_BOUNDS.0);
+
+            state.play_sine(frequency);
+        }
+
+        state.sound_already_played = true;
     }
 }
