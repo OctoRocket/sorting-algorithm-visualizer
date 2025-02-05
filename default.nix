@@ -9,7 +9,6 @@ rustPlatform.buildRustPackage rec {
         libxkbcommon
         libGL
         wayland
-        alsa-lib
     ];
 
     src = ./.;

@@ -7,4 +7,3 @@ edition = "2021"
 eframe = "0.30"
 image = { version = "0.25", default-features = false, features = ["png"] }
 rand = "0.8.5"
-rodio = { version = "0.20.1", default-features = false }
