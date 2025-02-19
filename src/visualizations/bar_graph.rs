@@ -97,7 +97,7 @@ impl BarGraph {
             let bar_height = ((number.1 as f32 - min_value) / max_value) * max_height;
             let color = if ctx.input(|i| i.time) - self.sorted_animation_time < SORTED_ANIMATION_LENGTH {
                 epaint::Color32::LIGHT_GREEN
-            } else if highlight_indices.contains(&number.0) {
+            } else if highlight_indices.contains(&number.0) && !self.sorted {
                 epaint::Color32::LIGHT_RED
             } else {
                 epaint::Color32::WHITE
