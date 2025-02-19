@@ -6,8 +6,16 @@ rustPlatform.buildRustPackage rec {
 
     nativeBuildInputs = with pkgs; [ makeWrapper ];
     buildInputs = with pkgs; [
+        # General
         libxkbcommon
         libGL
+
+        # X11
+        xorg.libX11
+        xorg.libXcursor
+        xorg.libXi
+
+        # Wayland
         wayland
     ];
 

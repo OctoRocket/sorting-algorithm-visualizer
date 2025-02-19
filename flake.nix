@@ -20,10 +20,18 @@
     in {
       devShells.default = pkgs.mkShell rec {
         buildInputs = with pkgs; [
+          # General
+          (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
           libxkbcommon
           libGL
+
+          # X11
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXi
+
+          # Wayland
           wayland
-          (rust-bin.stable.latest.default.override { extensions = ["rust-src"]; })
         ];
         LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";
       };
