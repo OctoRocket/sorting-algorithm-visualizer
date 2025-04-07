@@ -108,7 +108,7 @@ impl BarGraph {
                     epaint::pos2(bar_width.mul_add(number.0 as f32, rect.left()), rect.bottom() - base_height - base_spacing),
                     epaint::pos2(bar_width.mul_add((number.0 + 1) as f32, rect.left()), rect.bottom() - base_height - base_spacing - bar_height),
                 ),
-                epaint::Rounding::ZERO,
+                epaint::CornerRadius::ZERO,
                 color,
             );
             bars.push(bar);
@@ -121,7 +121,7 @@ impl BarGraph {
 impl Visualizer for BarGraph {
     fn draw_graph<'a>(&'a mut self, list: &'a [Vec<usize>], highlights: &'a [(usize, usize)]) -> Box<dyn FnMut(&mut egui::Ui) + 'a> {
         Box::new(move |ui| {
-            ui.ctx().request_repaint();
+            ui.ctx().request_repaint(); // Not sure if this is needed or not.
 
             // x and y of the desired size of the frame is 1 times the width and 0.35
             // times the width respectively.

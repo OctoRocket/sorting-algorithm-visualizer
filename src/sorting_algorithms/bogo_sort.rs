@@ -20,7 +20,7 @@ impl Default for BogoSort {
             name: "Bogo Sort",
             default_delay: time::Duration::from_millis(40),
             current_list: vec![(1..=4).collect()],
-            rng: rand::thread_rng(),
+            rng: rand::rng(),
         }
     }
 }

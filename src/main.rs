@@ -12,7 +12,10 @@ use std::{
     sync::Arc,
     time,
 };
-use eframe::egui::{self, epaint};
+use eframe::egui::{
+    self,
+    epaint,
+};
 use rand::prelude::*;
 use sorting_algorithms::SortingAlgorithm;
 use visualizations::Visualizer;
@@ -27,19 +30,10 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
 
-    eframe::run_native("Sorting Algorithm Visualizer", options, Box::new(|cc| Ok(Box::new(ProgramState::new(cc)))))
-}
-
-fn get_icon() -> egui::IconData {
-    let icon = include_bytes!("../icon.png");
-    let image = image::load_from_memory(icon).unwrap().to_rgba8();
-
-    let (width, height) = image.dimensions();
-    egui::IconData {
-        rgba: image.to_vec(),
-        width,
-        height,
-    }
+    eframe::run_native(
+        "Sorting Algorithm Visualizer",
+        options,
+        Box::new(|cc| Ok(Box::new(ProgramState::new(cc)))))
 }
 
 struct ProgramState<T: Ord> {
@@ -66,8 +60,9 @@ impl ProgramState<usize> {
         Self::default()
     }
 
+    // TODO: Should this be a function of the program state?
     fn shuffle(&mut self) {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let mut new_list = self.list
             .clone()
@@ -120,10 +115,8 @@ impl eframe::App for ProgramState<usize> {
         });
 
         // Things that need to be updated every frame (e.g. checking if the list
-        // is sorted (maybe should be moved so the sorting algorithm says when
-        // the list is sorted), updating the program state's list to be in sync
-        // with the algorithm's list (maybe should just be an empty algorithm?),
-        // etc)
+        // is sorted, updating the program state's list to be in sync with the
+        // algorithm's list, etc)
         frame_update(self, ctx);
     }
 }
@@ -251,5 +244,21 @@ fn frame_update(state: &mut ProgramState<usize>, ctx: &egui::Context) {
             state.time_of_last_step = time::SystemTime::now();
             algorithm.step();
         }
+    }
+}
+
+// Utility functions
+
+// Get the program icon
+// The icon isn't displayed on wayland for some reason.
+fn get_icon() -> egui::IconData {
+    let icon = include_bytes!("../icon.png");
+    let image = image::load_from_memory(icon).unwrap().to_rgba8();
+
+    let (width, height) = image.dimensions();
+    egui::IconData {
+        rgba: image.to_vec(),
+        width,
+        height,
     }
 }
