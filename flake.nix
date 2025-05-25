@@ -25,6 +25,9 @@
           libxkbcommon
           libGL
 
+          # Audio
+          alsa-lib
+
           # X11
           xorg.libX11
           xorg.libXcursor

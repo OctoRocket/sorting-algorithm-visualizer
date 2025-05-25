@@ -7,6 +7,7 @@
 
 mod sorting_algorithms;
 mod visualizations;
+mod audio;
 
 use std::{
     sync::Arc,
@@ -19,6 +20,7 @@ use eframe::egui::{
 use rand::prelude::*;
 use sorting_algorithms::SortingAlgorithm;
 use visualizations::Visualizer;
+use audio::AudioManager;
 
 fn main() -> eframe::Result {
     let viewport = egui::ViewportBuilder::default()
@@ -49,6 +51,9 @@ struct ProgramState<T: Ord> {
 
     // Visualizers
     visualizer: visualizations::bar_graph::BarGraph,
+
+    // Audio
+    audio_manager: AudioManager,
 
     // State bools
     running: bool,
@@ -93,6 +98,9 @@ impl Default for ProgramState<usize> {
             time_of_last_step: time::UNIX_EPOCH,
 
             visualizer: visualizations::bar_graph::BarGraph::default(),
+
+            audio_manager: AudioManager::default(),
+
             running: false,
             show_hightlights: true,
         }
@@ -134,6 +142,7 @@ fn draw_algorithm_selection(state: &mut ProgramState<usize>, ctx: &egui::Context
                     state.list = algorithm.get_list().0.into_iter().collect();
                     state.delay = algorithm.get_delay();
                     state.algorithm = Some(algorithm);
+                    state.audio_manager.button_press();
                 }
             }
         });
@@ -153,6 +162,7 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
                 let button_size = egui::vec2(ui.spacing().button_padding.x.mul_add(-1.35, ui.available_width() / 3.0), 0.0);
                 if ui.add(egui::Button::new("Play").min_size(button_size)).clicked() {
                     state.running = true;
+                    state.audio_manager.button_press();
                 }
                 if ui.add(egui::Button::new("Step").min_size(button_size)).clicked() {
                     state.running = false;
@@ -160,27 +170,25 @@ fn draw_settings_panel(state: &mut ProgramState<usize>, ctx: &egui::Context) {
                     if let Some(ref mut algorithm) = &mut state.algorithm {
                         algorithm.step();
                     }
+                    state.audio_manager.button_press();
                 }
                 if ui.add(egui::Button::new("Pause").min_size(button_size)).clicked() {
                     state.running = false;
+                    state.audio_manager.button_press();
                 }
             });
             if ui.button("Shuffle").clicked() {
                 state.shuffle();
+                state.audio_manager.button_press();
             }
             if ui.button("Toggle Highlights").clicked() {
                 state.show_hightlights = !state.show_hightlights;
+                state.audio_manager.button_press();
             }
 
-            // Draw seperating bar
-            ui.add_space(10.0);
-            let bar_height = 1.0;
-            let rect = ui.allocate_exact_size(
-                egui::vec2(ui.available_width(), bar_height),
-                egui::Sense::hover(),
-            ).0;
-            ui.painter().add(epaint::Shape::rect_filled(rect, 0.0, epaint::Color32::DARK_GRAY));
-            ui.add_space(10.0);
+            spacing_bar(ui);
+
+            // Settings
 
             ui.heading("Settings");
             ui.add_space(10.0);
@@ -261,4 +269,16 @@ fn get_icon() -> egui::IconData {
         width,
         height,
     }
+}
+
+fn spacing_bar(ui: &mut egui::Ui) {
+    // Draw seperating bar
+    ui.add_space(10.0);
+    let bar_height = 1.0;
+    let rect = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), bar_height),
+        egui::Sense::hover(),
+    ).0;
+    ui.painter().add(epaint::Shape::rect_filled(rect, 0.0, epaint::Color32::DARK_GRAY));
+    ui.add_space(10.0);
 }

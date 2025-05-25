@@ -4,11 +4,14 @@ rustPlatform.buildRustPackage rec {
     pname = "sorting-algorithm-visualizer";
     version = "0.1.0";
 
-    nativeBuildInputs = with pkgs; [ makeWrapper ];
+    nativeBuildInputs = with pkgs; [ makeWrapper pkg-config ];
     buildInputs = with pkgs; [
         # General
         libxkbcommon
         libGL
+
+        # Audio
+        alsa-lib
 
         # X11
         xorg.libX11
